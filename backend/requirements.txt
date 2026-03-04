@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-scikit-learn
 pymongo
-python-multipart
 python-dotenv
+scikit-learn
+python-multipart
+pdfplumber
