@@ -1,6 +1,5 @@
 import { useState } from "react";
 import axios from "axios";
-import GaugeChart from "react-gauge-chart";
 import { motion } from "framer-motion";
 
 export default function Analyze() {
@@ -11,7 +10,7 @@ export default function Analyze() {
 
   const analyzeResume = async () => {
     if (!resumeFile) {
-      alert("Please upload a resume first");
+      alert("Upload a resume");
       return;
     }
 
@@ -22,36 +21,26 @@ export default function Analyze() {
     try {
       setLoading(true);
 
-      const response = await axios.post(
+      const res = await axios.post(
         "https://ai-resume-analyzer-production-4363.up.railway.app/analyze",
         formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+        { headers: { "Content-Type": "multipart/form-data" } }
       );
 
-      setResult(response.data);
+      setResult(res.data);
       setLoading(false);
-    } catch (error) {
-      console.error(error);
-      alert("Error analyzing resume");
+    } catch (err) {
+      console.error(err);
+      alert("Analysis failed");
       setLoading(false);
     }
   };
 
   return (
-    <div style={containerStyle}>
-      <motion.h1
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        style={{ color: "white" }}
-      >
-        AI Resume Analyzer
-      </motion.h1>
+    <div style={container}>
+      <h1>AI Resume Analyzer</h1>
 
-      <div style={cardStyle}>
+      <div style={card}>
         <input
           type="file"
           accept=".pdf"
@@ -59,108 +48,95 @@ export default function Analyze() {
         />
 
         <textarea
-          placeholder="Paste job description here"
+          placeholder="Paste job description..."
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}
-          style={textareaStyle}
         />
 
-        <button onClick={analyzeResume} style={buttonStyle}>
-          Analyze Resume
-        </button>
+        <button onClick={analyzeResume}>Analyze Resume</button>
       </div>
 
-      {loading && <p style={{ color: "white" }}>Analyzing...</p>}
+      {loading && <p>Analyzing resume...</p>}
 
       {result && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          style={resultCard}
-        >
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={resultCard}>
+          
           <h2>ATS Score</h2>
 
-          <GaugeChart
-            id="ats-score"
-            nrOfLevels={20}
-            percent={result.score / 100}
-          />
-
-          <div style={section}>
-            <h3>Skills Found</h3>
-            <ul>
-              {result.skills_found?.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
+          <div style={progressBar}>
+            <div
+              style={{
+                ...progressFill,
+                width: `${result.score}%`,
+              }}
+            />
           </div>
 
-          <div style={section}>
-            <h3>Missing Skills</h3>
-            <ul>
-              {result.missing_skills?.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-          </div>
+          <p>{result.score}% Match</p>
 
-          <div style={section}>
-            <h3>Strengths</h3>
-            <p>{result.strengths}</p>
-          </div>
+          <h3>Skills Found</h3>
+          <ul>
+            {result.skills_found?.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
 
-          <div style={section}>
-            <h3>Improvements</h3>
-            <p>{result.improvements}</p>
-          </div>
+          <h3>Missing Skills</h3>
+          <ul>
+            {result.missing_skills?.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+
+          <h3>Strengths</h3>
+          <p>{result.strengths}</p>
+
+          <h3>Improvements</h3>
+          <p>{result.improvements}</p>
         </motion.div>
       )}
     </div>
   );
 }
 
-const containerStyle = {
+const container = {
   minHeight: "100vh",
-  background: "linear-gradient(135deg,#0f172a,#1e293b)",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  padding: "40px",
-};
-
-const cardStyle = {
-  background: "rgba(255,255,255,0.1)",
-  backdropFilter: "blur(10px)",
-  padding: "30px",
-  borderRadius: "12px",
-  display: "flex",
-  flexDirection: "column",
-  gap: "15px",
-  width: "400px",
-};
-
-const textareaStyle = {
-  height: "120px",
-};
-
-const buttonStyle = {
-  padding: "10px",
-  background: "#3b82f6",
-  border: "none",
+  background: "#0f172a",
   color: "white",
-  cursor: "pointer",
-  borderRadius: "6px",
+  padding: "40px",
+  textAlign: "center",
+};
+
+const card = {
+  background: "#1e293b",
+  padding: "20px",
+  borderRadius: "10px",
+  margin: "20px auto",
+  width: "400px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "10px",
 };
 
 const resultCard = {
-  marginTop: "30px",
-  background: "rgba(255,255,255,0.1)",
+  background: "#1e293b",
   padding: "25px",
+  marginTop: "30px",
   borderRadius: "10px",
-  color: "white",
   width: "500px",
+  marginLeft: "auto",
+  marginRight: "auto",
 };
 
-const section = {
-  marginTop: "20px",
+const progressBar = {
+  width: "100%",
+  height: "20px",
+  background: "#334155",
+  borderRadius: "10px",
+  overflow: "hidden",
+};
+
+const progressFill = {
+  height: "100%",
+  background: "#22c55e",
 };
