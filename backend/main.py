@@ -1,7 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
-
 from model import extract_text_from_pdf, analyze_resume
 from database import analysis_collection
 
@@ -15,25 +13,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
-def root():
-    return {"message": "Resume Analyzer API running"}
+def home():
+    return {"message": "AI Resume Analyzer API Running"}
 
 
 @app.post("/analyze")
-async def analyze(
-    file: UploadFile = File(...),
-    job_description: str = Form(...)
-):
+async def analyze(resume: UploadFile = File(...), job_description: str = Form(...)):
 
-    resume_text = extract_text_from_pdf(file.file)
+    resume_text = extract_text_from_pdf(resume.file)
 
     result = analyze_resume(resume_text, job_description)
 
     record = {
         "match_score": result["match_score"],
+        "ats_score": result["ats_score"],
+        "resume_skills": result["resume_skills"],
         "missing_skills": result["missing_skills"],
-        "created_at": datetime.utcnow()
+        "strengths": result["strengths"],
+        "improvements": result["improvements"]
     }
 
     analysis_collection.insert_one(record)
