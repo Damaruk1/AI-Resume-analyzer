@@ -1,40 +1,39 @@
-import { useEffect,useState } from "react"
-import { getHistory } from "../services/api"
+import { useEffect, useState } from "react";
+import axios from "axios";
 
-function History(){
+export default function History() {
+  const [history, setHistory] = useState([]);
 
-const [data,setData]=useState([])
+  useEffect(() => {
+    axios
+      .get("https://ai-resume-analyzer-production-4363.up.railway.app/history")
+      .then((res) => setHistory(res.data))
+      .catch((err) => console.error(err));
+  }, []);
 
-useEffect(()=>{
+  return (
+    <div className="page-container">
 
-getHistory().then(res=>setData(res.data))
+      <h1>Analysis History</h1>
 
-},[])
+      {history.map((item, i) => (
+        <div className="card" key={i}>
+          <h3>ATS Score: {item.score}</h3>
 
-return(
+          <p>
+            <strong>Missing Skills:</strong>{" "}
+            {item.missing_skills?.join(", ") || "None"}
+          </p>
 
-<div style={{padding:"40px"}}>
+          <p>
+            <strong>Strengths:</strong> {item.strengths}
+          </p>
 
-<h2>Analysis History</h2>
-
-{data.map((item,i)=>(
-
-<div key={i} style={{marginBottom:"20px"}}>
-
-<p>Score: {item.match_score}</p>
-
-<p>
-Missing Skills: {item.missing_skills.join(", ")}
-</p>
-
-</div>
-
-))}
-
-</div>
-
-)
-
+          <p>
+            <strong>Improvements:</strong> {item.improvements}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
 }
-
-export default History
