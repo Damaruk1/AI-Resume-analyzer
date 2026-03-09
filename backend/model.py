@@ -1,36 +1,54 @@
-import pdfplumber
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from model import extract_text_from_pdf, analyze_resume
+from database import analysis_collection
+
+app = FastAPI()
+
+# Allow frontend requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Root endpoint
+@app.get("/")
+def home():
+    return {"message": "AI Resume Analyzer API Running"}
 
 
-def extract_text_from_pdf(file):
+# Resume analysis endpoint
+@app.post("/analyze")
+async def analyze(resume: UploadFile = File(...), job_description: str = Form(...)):
 
-    text = ""
+    # Extract resume text
+    resume_text = extract_text_from_pdf(resume.file)
 
-    with pdfplumber.open(file) as pdf:
+    # Run analysis
+    result = analyze_resume(resume_text, job_description)
 
-        for page in pdf.pages:
-            text += page.extract_text()
-
-    return text
-
-
-def analyze_resume(resume_text, job_description):
-
-    documents = [resume_text, job_description]
-
-    vectorizer = TfidfVectorizer(stop_words="english")
-
-    vectors = vectorizer.fit_transform(documents)
-
-    similarity = cosine_similarity(vectors[0], vectors[1])[0][0]
-
-    resume_words = set(resume_text.lower().split())
-    job_words = set(job_description.lower().split())
-
-    missing_skills = list(job_words - resume_words)
-
-    return {
-        "match_score": round(similarity * 100,2),
-        "missing_skills": missing_skills[:10]
+    # Save result to MongoDB
+    record = {
+        "match_score": result["match_score"],
+        "ats_score": result["ats_score"],
+        "resume_skills": result["resume_skills"],
+        "missing_skills": result["missing_skills"],
+        "strengths": result["strengths"],
+        "improvements": result["improvements"]
     }
+
+    analysis_collection.insert_one(record)
+
+    return result
+
+
+# History endpoint
+@app.get("/history")
+def history():
+
+    records = list(analysis_collection.find({}, {"_id": 0}))
+
+    return records
