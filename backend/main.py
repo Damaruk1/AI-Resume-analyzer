@@ -7,7 +7,7 @@ import os
 
 app = FastAPI()
 
-# Allow frontend requests
+# Allow frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,41 +24,35 @@ db = client["resume_analyzer"]
 analysis_collection = db["analysis"]
 
 
-# Extract text from PDF
 def extract_text_from_pdf(file_path):
     text = ""
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
-            extracted = page.extract_text()
-            if extracted:
-                text += extracted
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
     return text
 
 
-# Resume analysis logic
 def analyze_resume(resume_text, job_description):
 
     resume_words = set(resume_text.lower().split())
     job_words = set(job_description.lower().split())
 
-    common_skills = resume_words.intersection(job_words)
-    missing_skills = job_words.difference(resume_words)
+    common = resume_words.intersection(job_words)
+    missing = job_words.difference(resume_words)
 
     if len(job_words) == 0:
         score = 0
     else:
-        score = int((len(common_skills) / len(job_words)) * 100)
-
-    strengths = f"Resume matches {len(common_skills)} relevant keywords from the job description."
-
-    improvements = "Consider adding these missing keywords: " + ", ".join(list(missing_skills)[:10])
+        score = int((len(common) / len(job_words)) * 100)
 
     return {
         "score": score,
-        "skills_found": list(common_skills)[:10],
-        "missing_skills": list(missing_skills)[:10],
-        "strengths": strengths,
-        "improvements": improvements
+        "skills_found": list(common)[:10],
+        "missing_skills": list(missing)[:10],
+        "strengths": f"Resume matches {len(common)} relevant keywords.",
+        "improvements": "Add more keywords from the job description."
     }
 
 
@@ -72,19 +66,22 @@ async def analyze(file: UploadFile = File(...), job_description: str = Form(...)
 
     contents = await file.read()
 
-    with open("temp_resume.pdf", "wb") as f:
+    with open("temp.pdf", "wb") as f:
         f.write(contents)
 
-    resume_text = extract_text_from_pdf("temp_resume.pdf")
+    resume_text = extract_text_from_pdf("temp.pdf")
 
     result = analyze_resume(resume_text, job_description)
 
+    # store in MongoDB
     analysis_collection.insert_one(result)
 
+    # IMPORTANT: return only the result (no ObjectId)
     return result
 
 
 @app.get("/history")
 def history():
+
     records = list(analysis_collection.find({}, {"_id": 0}))
     return records
