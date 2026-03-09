@@ -1,12 +1,13 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-import pdfplumber
 from pymongo import MongoClient
+import pdfplumber
 import certifi
 import os
 
 app = FastAPI()
 
+# Allow frontend requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,56 +16,49 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# MongoDB connection
 MONGO_URI = os.getenv("MONGO_URI")
-
 client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+
 db = client["resume_analyzer"]
 analysis_collection = db["analysis"]
 
 
-def extract_text_from_pdf(file):
+# Extract text from PDF
+def extract_text_from_pdf(file_path):
     text = ""
-    with pdfplumber.open(file) as pdf:
+    with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
-            text += page.extract_text() or ""
+            extracted = page.extract_text()
+            if extracted:
+                text += extracted
     return text
 
 
+# Resume analysis logic
 def analyze_resume(resume_text, job_description):
 
-    skills = [
-        "python",
-        "sql",
-        "machine learning",
-        "deep learning",
-        "data analysis",
-        "pandas",
-        "numpy",
-        "tensorflow",
-        "docker",
-        "aws",
-    ]
+    resume_words = set(resume_text.lower().split())
+    job_words = set(job_description.lower().split())
 
-    found = []
-    missing = []
+    common_skills = resume_words.intersection(job_words)
+    missing_skills = job_words.difference(resume_words)
 
-    for skill in skills:
-        if skill in resume_text.lower():
-            found.append(skill)
-        else:
-            missing.append(skill)
+    if len(job_words) == 0:
+        score = 0
+    else:
+        score = int((len(common_skills) / len(job_words)) * 100)
 
-    score = int((len(found) / len(skills)) * 100)
+    strengths = f"Resume matches {len(common_skills)} relevant keywords from the job description."
 
-    strengths = "Good alignment with technical skills."
-    improvements = "Add missing skills and quantify achievements."
+    improvements = "Consider adding these missing keywords: " + ", ".join(list(missing_skills)[:10])
 
     return {
         "score": score,
-        "skills_found": found,
-        "missing_skills": missing,
+        "skills_found": list(common_skills)[:10],
+        "missing_skills": list(missing_skills)[:10],
         "strengths": strengths,
-        "improvements": improvements,
+        "improvements": improvements
     }
 
 
@@ -74,29 +68,18 @@ def root():
 
 
 @app.post("/analyze")
-async def analyze(
-    file: UploadFile = File(...),
-    job_description: str = Form(...)
-):
+async def analyze(file: UploadFile = File(...), job_description: str = Form(...)):
 
     contents = await file.read()
 
-    with open("temp.pdf", "wb") as f:
+    with open("temp_resume.pdf", "wb") as f:
         f.write(contents)
 
-    resume_text = extract_text_from_pdf("temp.pdf")
+    resume_text = extract_text_from_pdf("temp_resume.pdf")
 
     result = analyze_resume(resume_text, job_description)
 
-    record = {
-        "score": result["score"],
-        "skills_found": result["skills_found"],
-        "missing_skills": result["missing_skills"],
-        "strengths": result["strengths"],
-        "improvements": result["improvements"],
-    }
-
-    analysis_collection.insert_one(record)
+    analysis_collection.insert_one(result)
 
     return result
 
